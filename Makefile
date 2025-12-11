@@ -1,6 +1,15 @@
-# Makefile for TLP
+# Makefile for TLP-PD
 # Copyright (c) 2025 Thomas Koch <linrunner at gmx.net> and others.
 # SPDX-License-Identifier: GPL-2.0-or-later
+TLPVER := $(shell read _ver _dummy < ./VERSION; printf '%s' "$${_ver:-undef}")
+ifneq (,$(shell which git 2> /dev/null))
+	ifneq (,$(shell echo "$(TLPVER)" | grep -E 'alpha|beta'))
+		COMMIT_ID := $(shell git rev-parse --short HEAD 2> /dev/null)
+		ifneq (,$(COMMIT_ID))
+			TLPVER := $(TLPVER)_$(COMMIT_ID)
+		endif
+	endif
+endif
 
 # Evaluate parameters
 TLP_SBIN    ?= /usr/sbin
@@ -61,6 +70,7 @@ _RUN     = $(DESTDIR)$(TLP_RUN)
 _VAR     = $(DESTDIR)$(TLP_VAR)
 
 SED = sed \
+    -e "s|@TLPVER@|$(TLPVER)|g" \
 	-e "s|@TLP_SBIN@|$(TLP_SBIN)|g" \
 	-e "s|@TLP_TLIB@|$(TLP_TLIB)|g" \
 	-e "s|@TLP_FLIB@|$(TLP_FLIB)|g" \
@@ -76,7 +86,11 @@ SED = sed \
 	-e "s|@TLP_VAR@|$(TLP_VAR)|g"
 
 INFILES = \
-	tlp-pd.service \
+	tlp-pd \
+	tlp-pd.service
+
+MANFILESPD8 = \
+	tlp-pd.service.8
 
 # Make targets
 all: $(INFILES)
@@ -97,7 +111,14 @@ install-pd: all
 		install -D -m 644 tlp-pd.dbus.service $(_DBSVC)/$(BUS_NAME).service; \
 		sed -e 's|@BUS_NAME@|$(BUS_NAME)|g' -i $(_DBSVC)/$(BUS_NAME).service;)
 
+install-man-pd:
+	# manpages
+	install -d -m 755 $(_MAN)/man8
+	cd man-pd && install -m 644 $(MANFILESPD8) $(_MAN)/man8/
+
 install: install-pd
+
+install-man: install-man-pd
 
 uninstall-pd:
 	rm -f $(_SBIN)/tlp-pd
@@ -107,4 +128,10 @@ uninstall-pd:
 	rm -f $(_DBCONF)/net.hadess.PowerProfiles.conf
 	rm -f $(_DBSVC)/net.hadess.PowerProfiles.service
 
+uninstall-man-pd:
+	# manpages
+	cd $(_MAN)/man8 && rm -f $(MANFILESPD8)
+
 uninstall: uninstall-pd
+
+uninstall-man: uninstall-man-pd
